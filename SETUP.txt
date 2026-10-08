@@ -1,0 +1,333 @@
+==============================================================
+  INDIAN UNION BUDGET ANALYSIS PLATFORM
+  Complete Setup & Run Guide for VS Code
+==============================================================
+
+Last updated : June 2026
+Platform     : Windows 10/11 · macOS 12+ · Ubuntu 22+
+Node version : 24.x  (required)
+Package mgr  : pnpm 9.x  (required)
+
+
+--------------------------------------------------------------
+SECTION 1 — WHAT YOU WILL NEED (install these first)
+--------------------------------------------------------------
+
+1. Node.js 24 (LTS)
+   Download : https://nodejs.org/en/download
+   Verify   : node -v   →  should print v24.x.x
+
+2. pnpm 9
+   Install  : npm install -g pnpm@9
+   Verify   : pnpm -v   →  should print 9.x.x
+
+3. VS Code (any recent version)
+   Download : https://code.visualstudio.com/
+
+4. Git (optional, for version control)
+   Download : https://git-scm.com/downloads
+
+5. Python 3.x (only if you plan to re-run the OCR pipeline)
+   The app itself does NOT need Python — only the data ingestion does.
+
+
+--------------------------------------------------------------
+SECTION 2 — PROJECT STRUCTURE
+--------------------------------------------------------------
+
+budget-platform/
+├── artifacts/
+│   ├── api-server/          ← Express 5 API (Node.js backend)
+│   │   ├── src/
+│   │   │   ├── routes/
+│   │   │   │   ├── budget.ts         — all /budget/* endpoints
+│   │   │   │   ├── export-route.ts   — CSV download endpoint
+│   │   │   │   └── pipeline-route.ts — DB health endpoint
+│   │   │   └── lib/
+│   │   │       └── budget-db.ts      — SQLite connection + constants
+│   │   └── package.json
+│   │
+│   └── budget-dashboard/    ← React 19 + Vite 7 frontend
+│       ├── src/
+│       │   ├── pages/       — 8 route pages
+│       │   ├── components/  — charts, layout, UI primitives
+│       │   └── lib/         — shared constants + helpers
+│       ├── index.html
+│       └── package.json
+│
+├── lib/
+│   ├── api-spec/            ← OpenAPI 3.1 spec (source of truth)
+│   ├── api-client-react/    ← Orval-generated TanStack Query hooks
+│   └── api-zod/             ← Orval-generated Zod schemas
+│
+├── outputs/
+│   └── db/
+│       └── budget.db        ← SQLite database  *** YOU MUST ADD THIS ***
+│
+├── pnpm-workspace.yaml      ← pnpm monorepo config
+├── package.json             ← root scripts
+├── tsconfig.json
+├── tsconfig.base.json
+└── replit.md                ← full architecture reference
+
+
+--------------------------------------------------------------
+SECTION 3 — DATABASE SETUP  (IMPORTANT — do this first)
+--------------------------------------------------------------
+
+The SQLite database file (budget.db, ~19 MB) is NOT included in
+the zip because of its size. You must place it yourself.
+
+  Step 1: Create the folder:
+          mkdir outputs\db          (Windows)
+          mkdir -p outputs/db       (macOS / Linux)
+
+  Step 2: Copy your budget.db file into that folder so the path is:
+          outputs/db/budget.db
+
+  Step 3: Verify the file is there:
+          dir outputs\db            (Windows)
+          ls -lh outputs/db         (macOS / Linux)
+
+The database contains a table called "budget_data" with 130,500 rows
+and the following key columns:
+  - scheme_name  TEXT
+  - sector       TEXT
+  - source       TEXT   (document identifier, encodes the year)
+  - attribute    TEXT   (filter on attribute = 'value_1')
+  - value        TEXT   (cast to FLOAT for calculations)
+
+
+--------------------------------------------------------------
+SECTION 4 — INSTALLATION
+--------------------------------------------------------------
+
+Open VS Code, then open the project folder (File → Open Folder).
+
+Open the integrated terminal (Ctrl+` or View → Terminal).
+
+Run these commands in order:
+
+  # 1. Install all dependencies (this will take 1–3 minutes)
+  pnpm install
+
+  # 2. Build the shared TypeScript libraries
+  pnpm run typecheck:libs
+
+  # 3. (Optional) Regenerate API hooks from the OpenAPI spec
+  #    Only needed if you change lib/api-spec/openapi.yaml
+  pnpm --filter @workspace/api-spec run codegen
+
+If pnpm install fails with a "better-sqlite3 native build" error:
+  - Make sure Python 3 and build tools are installed
+  - Windows: npm install -g windows-build-tools  (run as Administrator)
+  - macOS  : xcode-select --install
+  - Ubuntu : sudo apt-get install -y build-essential python3
+
+
+--------------------------------------------------------------
+SECTION 5 — RUNNING THE APP (requires TWO terminals)
+--------------------------------------------------------------
+
+The project has two separate services that must both run at the
+same time. Open two terminal tabs in VS Code (click the + icon).
+
+  TERMINAL 1 — API Server (backend)
+  ----------------------------------
+  pnpm --filter @workspace/api-server run dev
+
+  You should see output like:
+    {"level":30,"msg":"Server listening","port":8080}
+
+  The API server runs on http://localhost:8080
+  All API routes are prefixed with /api, e.g.:
+    http://localhost:8080/api/budget/years
+    http://localhost:8080/api/budget/sectors
+    http://localhost:8080/api/pipeline/status
+
+
+  TERMINAL 2 — Frontend (React + Vite)
+  -------------------------------------
+  pnpm --filter @workspace/budget-dashboard run dev
+
+  You should see output like:
+    VITE v7.x.x  ready in 800 ms
+    ➜  Local:   http://localhost:5173/
+
+  Open your browser at:  http://localhost:5173
+
+  NOTE: The Vite dev server proxies all /api/* requests to the
+  API server on port 8080 automatically. Do NOT open port 8080
+  directly — always use the Vite URL (port 5173).
+
+
+--------------------------------------------------------------
+SECTION 6 — VERIFYING EVERYTHING WORKS
+--------------------------------------------------------------
+
+In your browser open http://localhost:5173
+
+You should see:
+  ✓  "Union Budget Analysis" hero banner
+  ✓  KPI cards showing Total Schemes, Total Budget, Top Sector, etc.
+  ✓  Sector Allocation bar chart (10 sectors)
+  ✓  Sector Pie chart
+  ✓  14-Year Trend line chart
+  ✓  Budget Intensity Heatmap
+  ✓  Data Quality accuracy bars
+
+Navigate to all 8 pages to confirm:
+  ✓  /            Dashboard
+  ✓  /years       Browse all 14 years with sparkline cards
+  ✓  /year/2024-25   Single-year deep-dive
+  ✓  /sector/Education   Sector detail
+  ✓  /anomalies   Anomaly browser
+  ✓  /compare     Side-by-side year comparison
+  ✓  /search      Scheme full-text search
+  ✓  /pipeline    Database health / pipeline status
+
+If charts are blank but no errors appear, the database file is
+missing or is in the wrong location (see Section 3).
+
+
+--------------------------------------------------------------
+SECTION 7 — VS CODE RECOMMENDED EXTENSIONS
+--------------------------------------------------------------
+
+Install these from the VS Code Extensions panel (Ctrl+Shift+X):
+
+  esbenp.prettier-vscode          ← Code formatter
+  dbaeumer.vscode-eslint          ← TypeScript linting
+  bradlc.vscode-tailwindcss       ← Tailwind CSS IntelliSense
+  redhat.vscode-yaml              ← YAML for openapi.yaml
+  mtxr.sqltools                   ← Browse budget.db directly in VS Code
+    + mtxr.sqltools-driver-sqlite ← SQLite driver for SQLTools
+
+For SQLTools: open the extension → Add New Connection →
+  Driver: SQLite
+  Database file: ./outputs/db/budget.db
+
+You can then run raw SQL queries against the data directly in VS Code.
+
+
+--------------------------------------------------------------
+SECTION 8 — COMMON ERRORS & FIXES
+--------------------------------------------------------------
+
+ERROR: Cannot find module 'better-sqlite3'
+  FIX : pnpm install
+        If that fails, run: pnpm rebuild better-sqlite3
+
+ERROR: ENOENT outputs/db/budget.db
+  FIX : Make sure budget.db is placed at exactly outputs/db/budget.db
+        relative to the project root.
+
+ERROR: Port 8080 already in use
+  FIX : Kill whatever is using port 8080:
+        Windows : netstat -ano | findstr :8080  → taskkill /PID <pid> /F
+        macOS   : lsof -ti:8080 | xargs kill
+
+ERROR: Port 5173 already in use
+  FIX : Add PORT=5174 before the command:
+        PORT=5174 pnpm --filter @workspace/budget-dashboard run dev
+
+ERROR: "pnpm: command not found"
+  FIX : npm install -g pnpm@9   (then close and reopen terminal)
+
+ERROR: TypeScript errors after changing API routes
+  FIX : Run codegen + typecheck:
+        pnpm --filter @workspace/api-spec run codegen
+        pnpm run typecheck
+
+ERROR: Charts load but show 0 / empty data
+  FIX : Check the API server terminal for SQLite errors.
+        Confirm budget.db has 130,500 rows:
+        sqlite3 outputs/db/budget.db "SELECT COUNT(*) FROM budget_data;"
+
+
+--------------------------------------------------------------
+SECTION 9 — USEFUL SCRIPTS
+--------------------------------------------------------------
+
+  pnpm run typecheck          — Full TypeScript check (all packages)
+  pnpm run typecheck:libs     — Rebuild shared lib declarations only
+  pnpm run build              — Production build (all packages)
+
+  # Run codegen after editing the OpenAPI spec:
+  pnpm --filter @workspace/api-spec run codegen
+
+  # Test a single API endpoint from the terminal:
+  curl http://localhost:8080/api/budget/years
+  curl http://localhost:8080/api/budget/sectors
+  curl "http://localhost:8080/api/budget/summary/2024-25"
+  curl "http://localhost:8080/api/budget/sector-allocation/2024-25"
+  curl "http://localhost:8080/api/budget/compare?year1=2020-21&year2=2024-25"
+
+
+--------------------------------------------------------------
+SECTION 10 — PRODUCTION BUILD
+--------------------------------------------------------------
+
+To build optimised bundles for deployment:
+
+  # Build everything
+  pnpm run build
+
+  # API server bundle is at:
+  artifacts/api-server/dist/index.cjs
+
+  # Frontend static files are at:
+  artifacts/budget-dashboard/dist/
+
+To serve the production build:
+  node artifacts/api-server/dist/index.cjs   (in one terminal)
+
+  Then serve artifacts/budget-dashboard/dist/ with any static
+  file server, e.g.:
+    npx serve artifacts/budget-dashboard/dist -p 5173
+
+
+--------------------------------------------------------------
+SECTION 11 — TECH STACK REFERENCE
+--------------------------------------------------------------
+
+Layer          Technology               Version
+-----------    ----------------------   -------
+Runtime        Node.js                  24.x
+Package mgr    pnpm                     9.x
+Language       TypeScript               5.9
+Backend        Express                  5.x
+Database       SQLite (better-sqlite3)  read-only
+Frontend       React                    19.x
+Build tool     Vite                     7.x
+CSS            Tailwind CSS             4.x
+Charts         Recharts                 2.x
+Data fetching  TanStack Query (React)   5.x
+Routing        wouter                   3.x
+API contract   OpenAPI 3.1 + Orval      —
+Validation     Zod v4                   —
+Logging        pino                     —
+
+
+--------------------------------------------------------------
+SECTION 12 — DATA NOTES
+--------------------------------------------------------------
+
+- 130,500 rows from OCR-extracted Union Budget PDFs (2013-14 to 2026-27)
+- 10 sectors: Agriculture, Defence, Education, Energy, Health,
+  Rural Development, Science & Technology, Social Welfare,
+  Transport, Water & Sanitation
+- Two document types per year:
+    "Budget at a Glance"   → source prefix: budget_glance_
+    "Expenditure Profile"  → source prefix: expenditure_form_
+- Year filtering works via the YEAR_SOURCE_MAP in
+  artifacts/api-server/src/lib/budget-db.ts
+  There is NO "year" column in the database — years are encoded
+  in the "source" column.
+- Accuracy score is already a percentage (e.g., 91.4).
+  Do NOT multiply it by 100.
+
+
+==============================================================
+  END OF SETUP GUIDE
+==============================================================

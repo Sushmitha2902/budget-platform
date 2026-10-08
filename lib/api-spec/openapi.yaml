@@ -1,0 +1,454 @@
+openapi: 3.1.0
+info:
+  title: Api
+  version: 0.1.0
+  description: Indian Union Budget Analysis Platform API
+servers:
+  - url: /api
+    description: Base API path
+tags:
+  - name: health
+    description: Health operations
+  - name: budget
+    description: Budget data and analytics
+  - name: export
+    description: Data export
+  - name: pipeline
+    description: Pipeline management
+
+paths:
+  /healthz:
+    get:
+      operationId: healthCheck
+      tags: [health]
+      summary: Health check
+      responses:
+        "200":
+          description: Healthy
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthStatus"
+
+  /budget/years:
+    get:
+      operationId: getYears
+      tags: [budget]
+      summary: Get all available budget years
+      responses:
+        "200":
+          description: List of year labels
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: string
+
+  /budget/sectors:
+    get:
+      operationId: getSectors
+      tags: [budget]
+      summary: Get all budget sectors
+      responses:
+        "200":
+          description: List of sectors
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: string
+
+  /budget/summary/{year}:
+    get:
+      operationId: getYearSummary
+      tags: [budget]
+      summary: Get summary statistics for a specific year
+      parameters:
+        - name: year
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Year summary
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/YearSummary"
+
+  /budget/sector-allocation/{year}:
+    get:
+      operationId: getSectorAllocation
+      tags: [budget]
+      summary: Get sector allocation for a year
+      parameters:
+        - name: year
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: doc_type
+          in: query
+          required: false
+          schema:
+            type: string
+            default: budget_glance
+      responses:
+        "200":
+          description: Sector allocation data
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/SectorAllocation"
+
+  /budget/trend/{sector}:
+    get:
+      operationId: getSectorTrend
+      tags: [budget]
+      summary: Get trend data for a sector across all years
+      parameters:
+        - name: sector
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: doc_type
+          in: query
+          required: false
+          schema:
+            type: string
+            default: budget_glance
+      responses:
+        "200":
+          description: Sector trend data
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/TrendDataPoint"
+
+  /budget/heatmap:
+    get:
+      operationId: getHeatmap
+      tags: [budget]
+      summary: Get heatmap data for all sectors and years
+      parameters:
+        - name: doc_type
+          in: query
+          required: false
+          schema:
+            type: string
+            default: budget_glance
+      responses:
+        "200":
+          description: Heatmap matrix data
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HeatmapData"
+
+  /budget/anomalies:
+    get:
+      operationId: getAnomalies
+      tags: [budget]
+      summary: Get anomalous data entries
+      parameters:
+        - name: year
+          in: query
+          required: false
+          schema:
+            type: ["string", "null"]
+        - name: sector
+          in: query
+          required: false
+          schema:
+            type: ["string", "null"]
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+            default: 100
+      responses:
+        "200":
+          description: Anomaly records
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/AnomalyRecord"
+
+  /budget/schemes:
+    get:
+      operationId: getSchemes
+      tags: [budget]
+      summary: Get paginated scheme list with filters
+      parameters:
+        - name: year
+          in: query
+          required: false
+          schema:
+            type: ["string", "null"]
+        - name: sector
+          in: query
+          required: false
+          schema:
+            type: ["string", "null"]
+        - name: search
+          in: query
+          required: false
+          schema:
+            type: ["string", "null"]
+        - name: page
+          in: query
+          required: false
+          schema:
+            type: integer
+            default: 1
+        - name: page_size
+          in: query
+          required: false
+          schema:
+            type: integer
+            default: 25
+      responses:
+        "200":
+          description: Paginated schemes
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SchemeList"
+
+  /budget/accuracy:
+    get:
+      operationId: getAccuracy
+      tags: [budget]
+      summary: Get accuracy metrics
+      parameters:
+        - name: year
+          in: query
+          required: false
+          schema:
+            type: ["string", "null"]
+      responses:
+        "200":
+          description: Accuracy metrics
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AccuracyMetrics"
+
+  /budget/compare:
+    get:
+      operationId: compareTwoYears
+      tags: [budget]
+      summary: Compare sector allocations between two years
+      parameters:
+        - name: year1
+          in: query
+          required: true
+          schema:
+            type: string
+        - name: year2
+          in: query
+          required: true
+          schema:
+            type: string
+        - name: doc_type
+          in: query
+          required: false
+          schema:
+            type: string
+            default: budget_glance
+      responses:
+        "200":
+          description: Year comparison data
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/YearComparison"
+
+  /budget/top-schemes/{year}:
+    get:
+      operationId: getTopSchemes
+      tags: [budget]
+      summary: Get top schemes by value for a year
+      parameters:
+        - name: year
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: top_n
+          in: query
+          required: false
+          schema:
+            type: integer
+            default: 10
+        - name: sector
+          in: query
+          required: false
+          schema:
+            type: ["string", "null"]
+      responses:
+        "200":
+          description: Top schemes
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/SchemeRecord"
+
+  /export/csv/{year}:
+    get:
+      operationId: exportCsv
+      tags: [export]
+      summary: Export data as CSV for a year
+      parameters:
+        - name: year
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: CSV file
+          content:
+            text/csv:
+              schema:
+                type: string
+
+  /pipeline/status:
+    get:
+      operationId: getPipelineStatus
+      tags: [pipeline]
+      summary: Get pipeline status and row count
+      responses:
+        "200":
+          description: Pipeline status
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PipelineStatus"
+
+components:
+  schemas:
+    HealthStatus:
+      type: object
+      properties:
+        status:
+          type: string
+      required:
+        - status
+
+    YearSummary:
+      type: object
+      required: [year, total_schemes, total_rows, total_budget_value, top_sector, anomaly_count, accuracy_score]
+      properties:
+        year:          { type: string }
+        total_schemes: { type: integer }
+        total_rows:    { type: integer }
+        total_budget_value: { type: number }
+        top_sector:    { type: string }
+        anomaly_count: { type: integer }
+        accuracy_score: { type: number }
+
+    SectorAllocation:
+      type: object
+      required: [sector, total_value, row_count]
+      properties:
+        sector:      { type: string }
+        total_value: { type: number }
+        row_count:   { type: integer }
+
+    TrendDataPoint:
+      type: object
+      required: [year, total_value, row_count]
+      properties:
+        year:        { type: string }
+        total_value: { type: number }
+        row_count:   { type: integer }
+
+    HeatmapData:
+      type: object
+      required: [sectors, years, matrix]
+      properties:
+        sectors:
+          type: array
+          items: { type: string }
+        years:
+          type: array
+          items: { type: string }
+        matrix:
+          type: object
+          additionalProperties:
+            type: object
+            additionalProperties:
+              type: number
+
+    AnomalyRecord:
+      type: object
+      required: [scheme_name, sector, source, value]
+      properties:
+        scheme_name: { type: string }
+        sector:      { type: string }
+        source:      { type: string }
+        value:       { type: ["number", "null"] }
+        context:     { type: ["string", "null"] }
+
+    SchemeRecord:
+      type: object
+      required: [scheme_name, sector, value]
+      properties:
+        scheme_name: { type: string }
+        sector:      { type: string }
+        source:      { type: ["string", "null"] }
+        value:       { type: ["number", "null"] }
+
+    SchemeList:
+      type: object
+      required: [items, total, page, page_size]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/SchemeRecord"
+        total:     { type: integer }
+        page:      { type: integer }
+        page_size: { type: integer }
+
+    AccuracyMetrics:
+      type: object
+      required: [accuracy, valid_names_pct, valid_numbers_pct, valid_sector_pct, clean_rows_pct]
+      properties:
+        accuracy:          { type: number }
+        valid_names_pct:   { type: number }
+        valid_numbers_pct: { type: number }
+        valid_sector_pct:  { type: number }
+        clean_rows_pct:    { type: number }
+
+    YearComparison:
+      type: object
+      required: [sector, year1_value, year2_value, change_pct]
+      properties:
+        sector:      { type: string }
+        year1_value: { type: number }
+        year2_value: { type: number }
+        change_pct:  { type: number }
+
+    PipelineStatus:
+      type: object
+      required: [row_count, status]
+      properties:
+        row_count: { type: integer }
+        status:    { type: string }
